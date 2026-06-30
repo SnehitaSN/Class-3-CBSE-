@@ -207,40 +207,42 @@
             // Secure Audio Engine - Optimized for Mobile
             const speakText = (text, customLang) => {
                 if ('speechSynthesis' in window && audioUnlocked) {
-                    // Mobile Fix: Only cancel if currently speaking to prevent engine lockup
-                    if (window.speechSynthesis.speaking) {
-                        window.speechSynthesis.cancel(); 
+                    // Mobile Fix: Cancel any ongoing speech synchronously 
+                    window.speechSynthesis.cancel(); 
+                    
+                    // Mobile Fix: Force the speech engine to wake up (crucial for iOS)
+                    if (window.speechSynthesis.resume) {
+                        window.speechSynthesis.resume();
                     }
                     
-                    // Small timeout allows mobile engines to gracefully close previous requests before firing new ones
-                    setTimeout(() => {
-                        const utterance = new SpeechSynthesisUtterance(text);
-                        
-                        // Critical fix for mobile browsers: keeps utterance from being garbage collected
-                        window.currentUtterance = utterance; 
-                        
-                        const langCode = customLang || GAME_DATA[currentSubject].lang;
-                        utterance.lang = langCode;
-                        utterance.rate = 0.9;
-                        utterance.pitch = 1.1;
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    
+                    // Critical fix for mobile browsers: keeps utterance from being garbage collected
+                    window.currentUtterance = utterance; 
+                    
+                    const langCode = customLang || GAME_DATA[currentSubject].lang;
+                    utterance.lang = langCode;
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1.1;
 
-                        const voices = window.speechSynthesis.getVoices();
-                        const appropriateVoice = voices.find(v => v.lang.includes(langCode) || v.lang.includes(langCode.split('-')[0]));
-                        if (appropriateVoice) {
-                            utterance.voice = appropriateVoice;
-                        }
+                    // Try to force the correct accent if available on the computer/device
+                    const voices = window.speechSynthesis.getVoices();
+                    const appropriateVoice = voices.find(v => v.lang.includes(langCode) || v.lang.includes(langCode.split('-')[0]));
+                    if (appropriateVoice) {
+                        utterance.voice = appropriateVoice;
+                    }
 
-                        window.speechSynthesis.speak(utterance);
-                    }, 50);
+                    // Directly speak synchronously to satisfy iOS user-gesture requirements
+                    window.speechSynthesis.speak(utterance);
                 }
             };
 
             const unlockAudioAndStart = () => {
                 if ('speechSynthesis' in window) {
-                    // Play a completely silent utterance to satisfy browser permissions immediately
-                    const u = new SpeechSynthesisUtterance('');
-                    u.volume = 0; 
+                    // Mobile Fix: Play an AUDIBLE utterance to securely lock-in browser audio permissions
+                    const u = new SpeechSynthesisUtterance("Let's play!");
                     window.currentUtterance = u;
+                    u.rate = 1.2;
                     window.speechSynthesis.speak(u);
                 }
                 setAudioUnlocked(true);
